@@ -1151,9 +1151,6 @@ int __cil_typetransition_to_avtab(policydb_t *pdb, const struct cil_db *db, stru
 	type_datum_t *sepol_result = NULL;
 	filename_trans_t *newkey = NULL;
 	filename_trans_datum_t *newdatum = NULL, *otype = NULL;
-	ebitmap_t src_bitmap, tgt_bitmap;
-	ebitmap_node_t *node1, *node2;
-	unsigned int i, j;
 	struct cil_list_item *c;
 	char *name = DATUM(typetrans->name)->name;
 
@@ -1171,73 +1168,59 @@ int __cil_typetransition_to_avtab(policydb_t *pdb, const struct cil_db *db, stru
 		return __cil_type_rule_to_avtab(pdb, db, &trans, cond_node, cond_flavor);
 	}
 
-	rc = __cil_expand_type(typetrans->src, &src_bitmap);
-	if (rc != SEPOL_OK) goto exit;
-
-	rc = __cil_expand_type(typetrans->tgt, &tgt_bitmap);
-	if (rc != SEPOL_OK) goto exit;
-
 	class_list = cil_expand_class(typetrans->obj);
 
 	rc = __cil_get_sepol_type_datum(pdb, DATUM(typetrans->result), &sepol_result);
 	if (rc != SEPOL_OK) goto exit;
 
-	ebitmap_for_each_bit(&src_bitmap, node1, i) {
-		if (!ebitmap_get_bit(&src_bitmap, i)) continue;
+	rc = __cil_get_sepol_type_datum(pdb, DATUM(typetrans->src), &sepol_src);
+	if (rc != SEPOL_OK) goto exit;
 
-		rc = __cil_get_sepol_type_datum(pdb, DATUM(db->val_to_type[i]), &sepol_src);
+	rc = __cil_get_sepol_type_datum(pdb, DATUM(typetrans->tgt), &sepol_tgt);
+	if (rc != SEPOL_OK) goto exit;
+
+	cil_list_for_each(c, class_list) {
+		int add = CIL_TRUE;
+		rc = __cil_get_sepol_class_datum(pdb, DATUM(c->data), &sepol_obj);
 		if (rc != SEPOL_OK) goto exit;
 
-		ebitmap_for_each_bit(&tgt_bitmap, node2, j) {
-			if (!ebitmap_get_bit(&tgt_bitmap, j)) continue;
+		newkey = cil_calloc(1, sizeof(*newkey));
+		newdatum = cil_calloc(1, sizeof(*newdatum));
+		newkey->stype = sepol_src->s.value;
+		newkey->ttype = sepol_tgt->s.value;
+		newkey->tclass = sepol_obj->s.value;
+		newkey->name = cil_strdup(name);
+		newdatum->otype = sepol_result->s.value;
 
-			rc = __cil_get_sepol_type_datum(pdb, DATUM(db->val_to_type[j]), &sepol_tgt);
-			if (rc != SEPOL_OK) goto exit;
-
-			cil_list_for_each(c, class_list) {
-				int add = CIL_TRUE;
-				rc = __cil_get_sepol_class_datum(pdb, DATUM(c->data), &sepol_obj);
-				if (rc != SEPOL_OK) goto exit;
-
-				newkey = cil_calloc(1, sizeof(*newkey));
-				newdatum = cil_calloc(1, sizeof(*newdatum));
-				newkey->stype = sepol_src->s.value;
-				newkey->ttype = sepol_tgt->s.value;
-				newkey->tclass = sepol_obj->s.value;
-				newkey->name = cil_strdup(name);
-				newdatum->otype = sepol_result->s.value;
-
-				rc = hashtab_insert(filename_trans_table, (hashtab_key_t)newkey, newdatum);
-				if (rc != SEPOL_OK) {
-					if (rc == SEPOL_EEXIST) {
-						add = CIL_FALSE;
-						otype = hashtab_search(filename_trans_table, (hashtab_key_t)newkey);
-						if (newdatum->otype != otype->otype) {
-							cil_log(CIL_ERR, "Conflicting name type transition rules\n");
-						} else {
-							rc = SEPOL_OK;
-						}
-					} else {
-						cil_log(CIL_ERR, "Out of memory\n");
-					}
-				}
-
-				if (add == CIL_TRUE) {
-					rc = hashtab_insert(pdb->filename_trans,
-							    (hashtab_key_t)newkey,
-							    newdatum);
-					if (rc != SEPOL_OK) {
-						cil_log(CIL_ERR, "Out of memory\n");
-						goto exit;
-					}
+		rc = hashtab_insert(filename_trans_table, (hashtab_key_t)newkey, newdatum);
+		if (rc != SEPOL_OK) {
+			if (rc == SEPOL_EEXIST) {
+				add = CIL_FALSE;
+				otype = hashtab_search(filename_trans_table, (hashtab_key_t)newkey);
+				if (newdatum->otype != otype->otype) {
+					cil_log(CIL_ERR, "Conflicting name type transition rules\n");
 				} else {
-					free(newkey->name);
-					free(newkey);
-					free(newdatum);
-					if (rc != SEPOL_OK) {
-						goto exit;
-					}
+					rc = SEPOL_OK;
 				}
+			} else {
+				cil_log(CIL_ERR, "Out of memory\n");
+			}
+		}
+
+		if (add == CIL_TRUE) {
+			rc = hashtab_insert(pdb->filename_trans,
+						(hashtab_key_t)newkey,
+						newdatum);
+			if (rc != SEPOL_OK) {
+				cil_log(CIL_ERR, "Out of memory\n");
+				goto exit;
+			}
+		} else {
+			free(newkey->name);
+			free(newkey);
+			free(newdatum);
+			if (rc != SEPOL_OK) {
+				goto exit;
 			}
 		}
 	}
@@ -1245,8 +1228,6 @@ int __cil_typetransition_to_avtab(policydb_t *pdb, const struct cil_db *db, stru
 	rc = SEPOL_OK;
 
 exit:
-	ebitmap_destroy(&src_bitmap);
-	ebitmap_destroy(&tgt_bitmap);
 	cil_list_destroy(&class_list, CIL_FALSE);
 	return rc;
 }
