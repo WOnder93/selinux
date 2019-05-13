@@ -1080,7 +1080,7 @@ exit:
 	return rc;
 }
 
-int __cil_type_rule_to_avtab(policydb_t *pdb, const struct cil_db *db, struct cil_type_rule *cil_rule, cond_node_t *cond_node, enum cil_flavor cond_flavor)
+int __cil_type_rule_to_avtab(policydb_t *pdb, const struct cil_db *db __attribute__((unused)), struct cil_type_rule *cil_rule, cond_node_t *cond_node, enum cil_flavor cond_flavor)
 {
 	int rc = SEPOL_ERR;
 	uint16_t kind = cil_rule->rule_kind;
@@ -1089,49 +1089,30 @@ int __cil_type_rule_to_avtab(policydb_t *pdb, const struct cil_db *db, struct ci
 	class_datum_t *sepol_obj = NULL;
 	struct cil_list *class_list;
 	type_datum_t *sepol_result = NULL;
-	ebitmap_t src_bitmap, tgt_bitmap;
-	ebitmap_node_t *node1, *node2;
-	unsigned int i, j;
 	struct cil_list_item *c;
-
-	rc = __cil_expand_type(cil_rule->src, &src_bitmap);
-	if (rc != SEPOL_OK) goto exit;
-
-	rc = __cil_expand_type(cil_rule->tgt, &tgt_bitmap);
-	if (rc != SEPOL_OK) goto exit;
 
 	class_list = cil_expand_class(cil_rule->obj);
 
 	rc = __cil_get_sepol_type_datum(pdb, DATUM(cil_rule->result), &sepol_result);
 	if (rc != SEPOL_OK) goto exit;
 
-	ebitmap_for_each_bit(&src_bitmap, node1, i) {
-		if (!ebitmap_get_bit(&src_bitmap, i)) continue;
+	rc = __cil_get_sepol_type_datum(pdb, DATUM(cil_rule->src), &sepol_src);
+	if (rc != SEPOL_OK) goto exit;
 
-		rc = __cil_get_sepol_type_datum(pdb, DATUM(db->val_to_type[i]), &sepol_src);
+	rc = __cil_get_sepol_type_datum(pdb, DATUM(cil_rule->tgt), &sepol_tgt);
+	if (rc != SEPOL_OK) goto exit;
+
+	cil_list_for_each(c, class_list) {
+		rc = __cil_get_sepol_class_datum(pdb, DATUM(c->data), &sepol_obj);
 		if (rc != SEPOL_OK) goto exit;
 
-		ebitmap_for_each_bit(&tgt_bitmap, node2, j) {
-			if (!ebitmap_get_bit(&tgt_bitmap, j)) continue;
-
-			rc = __cil_get_sepol_type_datum(pdb, DATUM(db->val_to_type[j]), &sepol_tgt);
-			if (rc != SEPOL_OK) goto exit;
-
-			cil_list_for_each(c, class_list) {
-				rc = __cil_get_sepol_class_datum(pdb, DATUM(c->data), &sepol_obj);
-				if (rc != SEPOL_OK) goto exit;
-
-				rc = __cil_insert_type_rule(pdb, kind, sepol_src->s.value, sepol_tgt->s.value, sepol_obj->s.value, sepol_result->s.value, cil_rule, cond_node, cond_flavor);
-				if (rc != SEPOL_OK) goto exit;
-			}
-		}
+		rc = __cil_insert_type_rule(pdb, kind, sepol_src->s.value, sepol_tgt->s.value, sepol_obj->s.value, sepol_result->s.value, cil_rule, cond_node, cond_flavor);
+		if (rc != SEPOL_OK) goto exit;
 	}
 
 	rc = SEPOL_OK;
 
 exit:
-	ebitmap_destroy(&src_bitmap);
-	ebitmap_destroy(&tgt_bitmap);
 	cil_list_destroy(&class_list, CIL_FALSE);
 	return rc;
 }
