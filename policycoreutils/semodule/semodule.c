@@ -50,6 +50,8 @@ static int build;
 static int disable_dontaudit;
 static int preserve_tunables;
 static int ignore_module_cache;
+static unsigned policyvers;
+static int policyvers_set = 0;
 static uint16_t priority;
 static int priority_set = 0;
 
@@ -137,6 +139,7 @@ static void usage(char *progname)
 	printf("  -d,--disable=MODULE_NAME  disable module\n");
 	printf("  -E,--extract=MODULE_NAME  extract module\n");
 	printf("Options:\n");
+	printf("  -V,--policyvers  force specific kernel policy version\n");
 	printf("  -s,--store	   name of the store to operate on\n");
 	printf("  -N,-n,--noreload do not reload policy after commit\n");
 	printf("  -h,--help        print this message and quit\n");
@@ -210,7 +213,7 @@ static void parse_command_line(int argc, char **argv)
 	no_reload = 0;
 	priority = 400;
 	while ((i =
-		getopt_long(argc, argv, "s:b:hi:l::vr:u:RnNBDCPX:e:d:p:S:E:cH", opts,
+		getopt_long(argc, argv, "V:s:b:hi:l::vr:u:RnNBDCPX:e:d:p:S:E:cH", opts,
 			    NULL)) != -1) {
 		switch (i) {
 		case 'b':
@@ -247,6 +250,10 @@ static void parse_command_line(int argc, char **argv)
 		case 'u':
 			fprintf(stderr, "The --upgrade option is deprecated. Use --install instead.\n");
 			set_mode(INSTALL_M, optarg);
+			break;
+		case 'V':
+			policyvers = (unsigned)strtoul(optarg, NULL, 10);
+			policyvers_set = 1;
 			break;
 		case 's':
 			set_store(optarg);
@@ -362,6 +369,9 @@ int main(int argc, char *argv[])
 			argv[0]);
 		goto cleanup_nohandle;
 	}
+
+	if (policyvers_set)
+		semanage_set_policyvers(sh, policyvers);
 
 	if (store) {
 		/* Set the store we want to connect to, before connecting.
