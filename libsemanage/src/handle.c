@@ -81,6 +81,9 @@ semanage_handle_t *semanage_handle_create(void)
 		goto err;
 	sepol_msg_set_callback(sh->sepolh, semanage_msg_relay_handler, sh);
 
+	/* Default policy version is taken from config */
+	sh->policyvers = sh->conf->policyvers;
+
 	/* Default priority is 400 */
 	sh->priority = 400;
 
@@ -244,6 +247,27 @@ void semanage_set_check_contexts(semanage_handle_t * sh, int do_check_contexts)
 
 	sh->do_check_contexts = do_check_contexts;
 	return;
+}
+
+unsigned semanage_get_policyvers(semanage_handle_t *sh)
+{
+	assert(sh != NULL);
+	return sh->policyvers;
+}
+
+int semanage_set_policyvers(semanage_handle_t *sh, unsigned policyvers)
+{
+	assert(sh != NULL);
+
+	/* Verify policy version */
+	if (   policyvers < POLICYDB_VERSION_MIN
+	    || policyvers > POLICYDB_VERSION_MAX) {
+		ERR(sh, "Policy version %u is invalid.", policyvers);
+		return -1;
+	}
+
+	sh->policyvers = policyvers;
+	return 0;
 }
 
 uint16_t semanage_get_default_priority(semanage_handle_t *sh)

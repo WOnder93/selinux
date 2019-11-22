@@ -85,6 +85,12 @@ extern void semanage_set_disable_dontaudit(semanage_handle_t * handle, int disab
 /* Set whether or not to execute setfiles to check file contexts upon commit */
 extern void semanage_set_check_contexts(semanage_handle_t * sh, int do_check_contexts);
 
+/* Get the kernel policy version. */
+extern unsigned semanage_get_policyvers(semanage_handle_t *sh);
+
+/* Set the kernel policy version. */
+extern int semanage_set_policyvers(semanage_handle_t *sh, unsigned policyvers);
+
 /* Get the default priority. */
 extern uint16_t semanage_get_default_priority(semanage_handle_t *sh);
 

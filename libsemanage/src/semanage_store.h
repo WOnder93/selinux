@@ -81,7 +81,7 @@ enum semanage_final_path_defs {
 	SEMANAGE_FC_HOMEDIRS_BIN,
 	SEMANAGE_FC_LOCAL,
 	SEMANAGE_FC_LOCAL_BIN,
-	SEMANAGE_KERNEL,
+	SEMANAGE_KERNEL_PREFIX,
 	SEMANAGE_NC,
 	SEMANAGE_SEUSERS,
 	SEMANAGE_FINAL_PATH_NUM
@@ -101,6 +101,10 @@ extern const char *semanage_path(enum semanage_store_defs store,
 
 extern const char *semanage_final_path(enum semanage_final_defs root,
 				       enum semanage_final_path_defs suffix);
+
+int semanage_get_full_kernel_path(semanage_handle_t * sh,
+				  enum semanage_final_defs root,
+				  char out[PATH_MAX]);
 
 int semanage_create_store(semanage_handle_t * sh, int create);
 

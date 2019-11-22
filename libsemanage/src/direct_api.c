@@ -1204,6 +1204,7 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	size_t fc_buffer_len = 0;
 	const char *ofilename = NULL;
 	const char *path;
+	char kernel_path[PATH_MAX];
 	int retval = -1, num_modinfos = 0, i;
 	sepol_policydb_t *out = NULL;
 	struct cil_db *cildb = NULL;
@@ -1593,9 +1594,13 @@ rebuild:
 	if (retval < 0)
 		goto cleanup;
 
+	if (semanage_get_full_kernel_path(sh, SEMANAGE_FINAL_TMP, kernel_path)) {
+		ERR(sh, "Unable to build path to kernel policy.");
+		goto cleanup;
+	}
+
 	retval = semanage_copy_file(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_KERNEL),
-			semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_KERNEL),
-			sh->conf->file_mode);
+			kernel_path, sh->conf->file_mode);
 	if (retval < 0) {
 		goto cleanup;
 	}

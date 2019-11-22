@@ -277,9 +277,7 @@ cleanup:
 
 static int semanage_init_final_suffix(semanage_handle_t *sh)
 {
-	int ret = 0;
 	int status = 0;
-	char path[PATH_MAX];
 	size_t offset = strlen(selinux_policy_root());
 
 	semanage_final_suffix[SEMANAGE_FINAL_TOPLEVEL] = strdup("");
@@ -350,19 +348,9 @@ static int semanage_init_final_suffix(semanage_handle_t *sh)
 		goto cleanup;
 	}
 
-	ret = snprintf(path,
-		       sizeof(path),
-		       "%s.%d",
-		       selinux_binary_policy_path() + offset,
-		       sh->conf->policyvers);
-	if (ret < 0 || ret >= (int)sizeof(path)) {
-		ERR(sh, "Unable to compose policy binary path.");
-		status = -1;
-		goto cleanup;
-	}
-
-	semanage_final_suffix[SEMANAGE_KERNEL] = strdup(path);
-	if (semanage_final_suffix[SEMANAGE_KERNEL] == NULL) {
+	semanage_final_suffix[SEMANAGE_KERNEL_PREFIX] =
+		strdup(selinux_binary_policy_path() + offset);
+	if (semanage_final_suffix[SEMANAGE_KERNEL_PREFIX] == NULL) {
 		ERR(sh, "Unable to allocate space for policy binary path.");
 		status = -1;
 		goto cleanup;
@@ -501,6 +489,20 @@ const char *semanage_final_path(enum semanage_final_defs store,
 {
 	assert(semanage_final_paths[store][path_name]);
 	return semanage_final_paths[store][path_name];
+}
+
+/* Return a fully-qualified path + filename to kernel policy for the given
+ * semanage store.
+ */
+int semanage_get_full_kernel_path(semanage_handle_t * sh,
+				  enum semanage_final_defs root,
+				  char out[PATH_MAX])
+{
+	int ret = snprintf(out, PATH_MAX, "%s.%u",
+			   semanage_final_path(root, SEMANAGE_KERNEL_PREFIX),
+			   sh->policyvers);
+
+	return ret < 0 || ret >= PATH_MAX ? -1 : 0;
 }
 
 /* Return a fully-qualified path + filename to the semanage
@@ -1568,12 +1570,16 @@ static int semanage_validate_and_compile_fcontexts(semanage_handle_t * sh)
 	int status = -1;
 
 	if (sh->do_check_contexts) {
+		char path[PATH_MAX];
 		int ret;
+
+		if (semanage_get_full_kernel_path(sh, SEMANAGE_FINAL_TMP, path)) {
+			ERR(sh, "Unable to build path to kernel policy.");
+			goto cleanup;
+		}
+
 		ret = semanage_exec_prog(
-			sh,
-			sh->conf->setfiles,
-			semanage_final_path(SEMANAGE_FINAL_TMP,
-					    SEMANAGE_KERNEL),
+			sh, sh->conf->setfiles, path,
 			semanage_final_path(SEMANAGE_FINAL_TMP,
 					    SEMANAGE_FC));
 		if (ret != 0) {
@@ -2233,15 +2239,19 @@ int semanage_verify_linked(semanage_handle_t * sh)
 int semanage_verify_kernel(semanage_handle_t * sh)
 {
 	int retval = -1;
-	const char *kernel_filename =
-	    semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_KERNEL);
+	char path[PATH_MAX];
 	semanage_conf_t *conf = sh->conf;
 	external_prog_t *e;
+
 	if (conf->kernel_prog == NULL) {
 		return 0;
 	}
+	if (semanage_get_full_kernel_path(sh, SEMANAGE_FINAL_TMP, path)) {
+		ERR(sh, "Unable to build path to kernel policy.");
+		goto cleanup;
+	}
 	for (e = conf->kernel_prog; e != NULL; e = e->next) {
-		if (semanage_exec_prog(sh, e, kernel_filename, "$<") != 0) {
+		if (semanage_exec_prog(sh, e, path, "$<") != 0) {
 			goto cleanup;
 		}
 	}

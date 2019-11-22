@@ -57,6 +57,7 @@ struct semanage_handle {
 
 	semanage_conf_t *conf;
 
+	unsigned policyvers;
 	uint16_t priority;
 	int is_connected;
 	int is_in_transaction;
