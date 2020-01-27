@@ -591,6 +591,9 @@ typedef struct policydb {
 
 	/* file transitions with the last path component */
 	hashtab_t filename_trans;
+	/* path component buffer for file transitions */
+	char *filename_mem;
+	uint32_t filename_mem_size;
 
 	ebitmap_t *type_attr_map;
 
@@ -743,10 +746,11 @@ extern int policydb_set_target_platform(policydb_t *p, int platform);
 #define POLICYDB_VERSION_XPERMS_IOCTL	30 /* Linux-specific */
 #define POLICYDB_VERSION_INFINIBAND		31 /* Linux-specific */
 #define POLICYDB_VERSION_GLBLUB		32
+#define POLICYDB_VERSION_FNAME_TABLE	33
 
 /* Range of policy versions we understand*/
 #define POLICYDB_VERSION_MIN	POLICYDB_VERSION_BASE
-#define POLICYDB_VERSION_MAX	POLICYDB_VERSION_GLBLUB
+#define POLICYDB_VERSION_MAX	POLICYDB_VERSION_FNAME_TABLE
 
 /* Module versions and specific changes*/
 #define MOD_POLICYDB_VERSION_BASE		4
@@ -768,9 +772,10 @@ extern int policydb_set_target_platform(policydb_t *p, int platform);
 #define MOD_POLICYDB_VERSION_XPERMS_IOCTL  18
 #define MOD_POLICYDB_VERSION_INFINIBAND		19
 #define MOD_POLICYDB_VERSION_GLBLUB		20
+#define MOD_POLICYDB_VERSION_FNAME_TABLE	21
 
 #define MOD_POLICYDB_VERSION_MIN MOD_POLICYDB_VERSION_BASE
-#define MOD_POLICYDB_VERSION_MAX MOD_POLICYDB_VERSION_GLBLUB
+#define MOD_POLICYDB_VERSION_MAX MOD_POLICYDB_VERSION_FNAME_TABLE
 
 #define POLICYDB_CONFIG_MLS    1
 
@@ -783,6 +788,12 @@ extern int policydb_set_target_platform(policydb_t *p, int platform);
 	  && p->policyvers >= POLICYDB_VERSION_BOUNDARY) ||	\
 	 ((p)->policy_type != POLICY_KERN			\
 	  && p->policyvers >= MOD_POLICYDB_VERSION_BOUNDARY))
+
+#define policydb_has_fname_table_feature(p)			\
+	(((p)->policy_type == POLICY_KERN			\
+	  && p->policyvers >= POLICYDB_VERSION_FNAME_TABLE) ||	\
+	 ((p)->policy_type != POLICY_KERN			\
+	  && p->policyvers >= MOD_POLICYDB_VERSION_FNAME_TABLE))
 
 /* the config flags related to unknown classes/perms are bits 2 and 3 */
 #define DENY_UNKNOWN	SEPOL_DENY_UNKNOWN

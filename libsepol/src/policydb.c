@@ -202,6 +202,13 @@ static struct policydb_compat_info policydb_compat[] = {
 	 .target_platform = SEPOL_TARGET_SELINUX,
 	},
 	{
+	 .type = POLICY_KERN,
+	 .version = POLICYDB_VERSION_FNAME_TABLE,
+	 .sym_num = SYM_NUM,
+	 .ocon_num = OCON_IBENDPORT + 1,
+	 .target_platform = SEPOL_TARGET_SELINUX,
+	},
+	{
 	 .type = POLICY_BASE,
 	 .version = MOD_POLICYDB_VERSION_BASE,
 	 .sym_num = SYM_NUM,
@@ -321,6 +328,13 @@ static struct policydb_compat_info policydb_compat[] = {
 	 .target_platform = SEPOL_TARGET_SELINUX,
 	},
 	{
+	 .type = POLICY_BASE,
+	 .version = MOD_POLICYDB_VERSION_FNAME_TABLE,
+	 .sym_num = SYM_NUM,
+	 .ocon_num = OCON_IBENDPORT + 1,
+	 .target_platform = SEPOL_TARGET_SELINUX,
+	},
+	{
 	 .type = POLICY_MOD,
 	 .version = MOD_POLICYDB_VERSION_BASE,
 	 .sym_num = SYM_NUM,
@@ -439,7 +453,13 @@ static struct policydb_compat_info policydb_compat[] = {
 	 .ocon_num = 0,
 	 .target_platform = SEPOL_TARGET_SELINUX,
 	},
-
+	{
+	 .type = POLICY_MOD,
+	 .version = MOD_POLICYDB_VERSION_FNAME_TABLE,
+	 .sym_num = SYM_NUM,
+	 .ocon_num = 0,
+	 .target_platform = SEPOL_TARGET_SELINUX,
+	},
 };
 
 #if 0
@@ -1408,10 +1428,12 @@ common_destroy, class_destroy, role_destroy, type_destroy, user_destroy,
 	    cond_destroy_bool, sens_destroy, cat_destroy,};
 
 static int filenametr_destroy(hashtab_key_t key, hashtab_datum_t datum,
-			      void *p __attribute__ ((unused)))
+			      void *param)
 {
+	struct policydb *p = param;
 	struct filename_trans *ft = (struct filename_trans *)key;
-	free(ft->name);
+	if (!policydb_has_fname_table_feature(p))
+		free(ft->name);
 	free(key);
 	free(datum);
 	return 0;
@@ -1552,8 +1574,10 @@ void policydb_destroy(policydb_t * p)
 	if (lra)
 		free(lra);
 
-	hashtab_map(p->filename_trans, filenametr_destroy, NULL);
+	hashtab_map(p->filename_trans, filenametr_destroy, p);
 	hashtab_destroy(p->filename_trans);
+
+	free(p->filename_mem);
 
 	hashtab_map(p->range_tr, range_tr_destroy, NULL);
 	hashtab_destroy(p->range_tr);
@@ -2603,11 +2627,32 @@ int role_allow_read(role_allow_t ** r, struct policy_file *fp)
 int filename_trans_read(policydb_t *p, struct policy_file *fp)
 {
 	unsigned int i;
-	uint32_t buf[4], nel, len;
+	uint32_t buf[4], nel, len, off;
 	filename_trans_t *ft;
 	filename_trans_datum_t *otype;
 	int rc;
 	char *name;
+
+	if (policydb_has_fname_table_feature(p)) {
+		rc = next_entry(buf, fp, sizeof(uint32_t));
+		if (rc < 0)
+			return -1;
+		len = le32_to_cpu(buf[0]);
+		if (len > 0) {
+			p->filename_mem = malloc(len);
+			if (!p->filename_mem)
+				return -1;
+
+			p->filename_mem_size = len;
+
+			rc = next_entry(p->filename_mem, fp, len);
+			if (rc < 0)
+				return -1;
+
+			if (p->filename_mem[len - 1] != '\0')
+				return -1;
+		}
+	}
 
 	rc = next_entry(buf, fp, sizeof(uint32_t));
 	if (rc < 0)
@@ -2625,22 +2670,35 @@ int filename_trans_read(policydb_t *p, struct policy_file *fp)
 		otype = calloc(1, sizeof(*otype));
 		if (!otype)
 			goto err;
-		rc = next_entry(buf, fp, sizeof(uint32_t));
-		if (rc < 0)
-			goto err;
-		len = le32_to_cpu(buf[0]);
-		if (zero_or_saturated(len))
-			goto err;
 
-		name = calloc(len + 1, sizeof(*name));
-		if (!name)
-			goto err;
+		if (policydb_has_fname_table_feature(p)) {
+			rc = next_entry(buf, fp, sizeof(uint32_t));
+			if (rc < 0)
+				goto err;
+			off = le32_to_cpu(buf[0]);
 
-		ft->name = name;
+			if (off >= p->filename_mem_size)
+				goto err;
 
-		rc = next_entry(name, fp, len);
-		if (rc < 0)
-			goto err;
+			ft->name = p->filename_mem + off;
+		} else {
+			rc = next_entry(buf, fp, sizeof(uint32_t));
+			if (rc < 0)
+				goto err;
+			len = le32_to_cpu(buf[0]);
+			if (zero_or_saturated(len))
+				goto err;
+
+			name = calloc(len + 1, sizeof(*name));
+			if (!name)
+				goto err;
+
+			ft->name = name;
+
+			rc = next_entry(name, fp, len);
+			if (rc < 0)
+				goto err;
+		}
 
 		rc = next_entry(buf, fp, sizeof(uint32_t) * 4);
 		if (rc < 0)

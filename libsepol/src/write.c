@@ -570,23 +570,38 @@ static int role_allow_write(role_allow_t * r, struct policy_file *fp)
 	return POLICYDB_SUCCESS;
 }
 
+struct filename_write_param {
+	struct policydb *p;
+	void *fp;
+};
+
 static int filename_write_helper(hashtab_key_t key, void *data, void *ptr)
 {
+	struct filename_write_param *param = ptr;
 	uint32_t buf[4];
-	size_t items, len;
+	size_t items, len, off;
+	struct policydb *p = param->p;
 	struct filename_trans *ft = (struct filename_trans *)key;
 	struct filename_trans_datum *otype = data;
-	void *fp = ptr;
+	void *fp = param->fp;
 
-	len = strlen(ft->name);
-	buf[0] = cpu_to_le32(len);
-	items = put_entry(buf, sizeof(uint32_t), 1, fp);
-	if (items != 1)
-		return POLICYDB_ERROR;
+	if (policydb_has_fname_table_feature(p)) {
+		off = ft->name - p->filename_mem;
+		buf[0] = cpu_to_le32(off);
+		items = put_entry(buf, sizeof(uint32_t), 1, fp);
+		if (items != 1)
+			return POLICYDB_ERROR;
+	} else {
+		len = strlen(ft->name);
+		buf[0] = cpu_to_le32(len);
+		items = put_entry(buf, sizeof(uint32_t), 1, fp);
+		if (items != 1)
+			return POLICYDB_ERROR;
 
-	items = put_entry(ft->name, sizeof(char), len, fp);
-	if (items != len)
-		return POLICYDB_ERROR;
+		items = put_entry(ft->name, sizeof(char), len, fp);
+		if (items != len)
+			return POLICYDB_ERROR;
+	}
 
 	buf[0] = cpu_to_le32(ft->stype);
 	buf[1] = cpu_to_le32(ft->ttype);
@@ -601,6 +616,7 @@ static int filename_write_helper(hashtab_key_t key, void *data, void *ptr)
 
 static int filename_trans_write(struct policydb *p, void *fp)
 {
+	struct filename_write_param param = { .p = p, .fp = fp };
 	size_t nel, items;
 	uint32_t buf[1];
 	int rc;
@@ -608,13 +624,24 @@ static int filename_trans_write(struct policydb *p, void *fp)
 	if (p->policyvers < POLICYDB_VERSION_FILENAME_TRANS)
 		return 0;
 
+	if (policydb_has_fname_table_feature(p)) {
+		buf[0] = cpu_to_le32(p->filename_mem_size);
+		items = put_entry(buf, sizeof(uint32_t), 1, fp);
+		if (items != 1)
+			return POLICYDB_ERROR;
+
+		items = put_entry(p->filename_mem, 1, p->filename_mem_size, fp);
+		if (items != p->filename_mem_size)
+			return POLICYDB_ERROR;
+	}
+
 	nel =  p->filename_trans->nel;
 	buf[0] = cpu_to_le32(nel);
 	items = put_entry(buf, sizeof(uint32_t), 1, fp);
 	if (items != 1)
 		return POLICYDB_ERROR;
 
-	rc = hashtab_map(p->filename_trans, filename_write_helper, fp);
+	rc = hashtab_map(p->filename_trans, filename_write_helper, &param);
 	if (rc)
 		return rc;
 

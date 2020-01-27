@@ -1368,8 +1368,51 @@ static int copy_role_trans(expand_state_t * state, role_trans_rule_t * rules)
 	return 0;
 }
 
+static int build_filename_table(filename_trans_rule_t *rules, char**out,
+				uint32_t *out_size)
+{
+	filename_trans_rule_t *cur_rule;
+	size_t size = 0, capacity = 1024, new_capacity;
+	char *table, *new_table;
+
+	table = malloc(capacity);
+	if (!table)
+		return -1;
+
+	for (cur_rule = rules; cur_rule; cur_rule = cur_rule->next) {
+		size_t name_size = strlen(cur_rule->name) + 1;
+
+		if (memmem(table, size, cur_rule->name, name_size))
+			continue;
+
+		new_capacity = capacity;
+		while (new_capacity < size + name_size) {
+			if (new_capacity > UINT32_MAX) {
+				free(table);
+				return -1;
+			}
+			new_capacity *= 2;
+		}
+		if (new_capacity > capacity) {
+			new_table = realloc(table, new_capacity);
+			if (!new_table) {
+				free(table);
+				return -1;
+			}
+			table = new_table;
+			capacity = new_capacity;
+		}
+		memcpy(table + size, cur_rule->name, name_size);
+		size += name_size;
+	}
+	*out = table;
+	*out_size = (uint32_t)size;
+	return 0;
+}
+
 static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *rules)
 {
+	char *new_name;
 	unsigned int i, j;
 	filename_trans_t key, *new_trans;
 	filename_trans_datum_t *otype;
@@ -1377,6 +1420,15 @@ static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *r
 	ebitmap_t stypes, ttypes;
 	ebitmap_node_t *snode, *tnode;
 	int rc;
+
+	if (policydb_has_fname_table_feature(state->out) && rules) {
+		rc = build_filename_table(rules, &state->out->filename_mem,
+					  &state->out->filename_mem_size);
+		if (rc < 0) {
+			ERR(state->handle, "Out of memory!");
+			return -1;
+		}
+	}
 
 	cur_rule = rules;
 	while (cur_rule) {
@@ -1428,11 +1480,21 @@ static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *r
 					return -1;
 				}
 
-				new_trans->name = strdup(cur_rule->name);
-				if (!new_trans->name) {
-					ERR(state->handle, "Out of memory!");
-					free(new_trans);
-					return -1;
+				if (policydb_has_fname_table_feature(state->out)) {
+					new_name = NULL;
+					new_trans->name = memmem(
+						state->out->filename_mem,
+						state->out->filename_mem_size,
+						cur_rule->name,
+						strlen(cur_rule->name) + 1);
+				} else {
+					new_name = strdup(cur_rule->name);
+					if (!new_name) {
+						ERR(state->handle, "Out of memory!");
+						free(new_trans);
+						return -1;
+					}
+					new_trans->name = new_name;
 				}
 				new_trans->stype = i + 1;
 				new_trans->ttype = j + 1;
@@ -1441,7 +1503,7 @@ static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *r
 				otype = calloc(1, sizeof(*otype));
 				if (!otype) {
 					ERR(state->handle, "Out of memory!");
-					free(new_trans->name);
+					free(new_name);
 					free(new_trans);
 					return -1;
 				}
@@ -1453,7 +1515,7 @@ static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *r
 				if (rc) {
 					ERR(state->handle, "Out of memory!");
 					free(otype);
-					free(new_trans->name);
+					free(new_name);
 					free(new_trans);
 					return -1;
 				}
