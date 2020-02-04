@@ -591,9 +591,9 @@ typedef struct policydb {
 
 	/* file transitions with the last path component */
 	hashtab_t filename_trans;
-	/* path component buffer for file transitions */
-	char *filename_mem;
-	uint32_t filename_mem_size;
+	/* path component storage for file transitions */
+	hashtab_t filename_set;
+	uint32_t total_filename_len;
 
 	ebitmap_t *type_attr_map;
 
@@ -772,7 +772,7 @@ extern int policydb_set_target_platform(policydb_t *p, int platform);
 #define MOD_POLICYDB_VERSION_XPERMS_IOCTL  18
 #define MOD_POLICYDB_VERSION_INFINIBAND		19
 #define MOD_POLICYDB_VERSION_GLBLUB		20
-#define MOD_POLICYDB_VERSION_FNAME_TABLE	21
+#define MOD_POLICYDB_VERSION_FNAME_TABLE	21 //FIXME remove this
 
 #define MOD_POLICYDB_VERSION_MIN MOD_POLICYDB_VERSION_BASE
 #define MOD_POLICYDB_VERSION_MAX MOD_POLICYDB_VERSION_FNAME_TABLE

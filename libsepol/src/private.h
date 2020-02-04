@@ -61,6 +61,11 @@ extern struct policydb_compat_info *policydb_lookup_compat(unsigned int version,
 							   unsigned int type,
 						unsigned int target_platform);
 
+extern int policydb_add_filename_trans_rule(policydb_t *p, uint32_t stype,
+					    uint32_t ttype, uint16_t tclass,
+					    const char *name, char **alloc_name,
+					    uint32_t otype, uint32_t *final_otype);
+
 /* Reading from a policy "file". */
 extern int next_entry(void *buf, struct policy_file *fp, size_t bytes) hidden;
 extern size_t put_entry(const void *ptr, size_t size, size_t n,

@@ -573,9 +573,33 @@ static int role_allow_write(role_allow_t * r, struct policy_file *fp)
 struct filename_write_param {
 	struct policydb *p;
 	void *fp;
+	hashtab_t filename_offsets;
+	size_t offset;
 };
 
-static int filename_write_helper(hashtab_key_t key, void *data, void *ptr)
+static int filename_write_helper(hashtab_key_t key,
+				 void *data __attribute__ ((unused)),
+				 void *ptr)
+{
+	struct filename_write_param *param = ptr;
+	size_t items, size;
+	int rc;
+
+	size = strlen(key) + 1;
+
+	rc = hashtab_insert(param->filename_offsets, key, (void *)param->offset);
+	if (rc)
+		return POLICYDB_ERROR;
+
+	items = put_entry(key, 1, size, param->fp);
+	if (items != size)
+		return POLICYDB_ERROR;
+
+	param->offset += size;
+	return 0;
+}
+
+static int filenametr_write_helper(hashtab_key_t key, void *data, void *ptr)
 {
 	struct filename_write_param *param = ptr;
 	uint32_t buf[4];
@@ -586,7 +610,7 @@ static int filename_write_helper(hashtab_key_t key, void *data, void *ptr)
 	void *fp = param->fp;
 
 	if (policydb_has_fname_table_feature(p)) {
-		off = ft->name - p->filename_mem;
+		off = (size_t)hashtab_search(param->filename_offsets, ft->name);
 		buf[0] = cpu_to_le32(off);
 		items = put_entry(buf, sizeof(uint32_t), 1, fp);
 		if (items != 1)
@@ -625,27 +649,34 @@ static int filename_trans_write(struct policydb *p, void *fp)
 		return 0;
 
 	if (policydb_has_fname_table_feature(p)) {
-		buf[0] = cpu_to_le32(p->filename_mem_size);
+		buf[0] = cpu_to_le32(p->total_filename_len);
 		items = put_entry(buf, sizeof(uint32_t), 1, fp);
 		if (items != 1)
 			return POLICYDB_ERROR;
 
-		items = put_entry(p->filename_mem, 1, p->filename_mem_size, fp);
-		if (items != p->filename_mem_size)
+		param.filename_offsets = hashtab_create(p->filename_set->hash_value,
+							p->filename_set->keycmp,
+							p->filename_set->size);
+		if (!param.filename_offsets)
 			return POLICYDB_ERROR;
+
+		rc = hashtab_map(p->filename_set, filename_write_helper, &param);
+		if (rc)
+			goto out;
 	}
 
 	nel =  p->filename_trans->nel;
 	buf[0] = cpu_to_le32(nel);
 	items = put_entry(buf, sizeof(uint32_t), 1, fp);
-	if (items != 1)
-		return POLICYDB_ERROR;
+	if (items != 1) {
+		rc = POLICYDB_ERROR;
+		goto out;
+	}
 
-	rc = hashtab_map(p->filename_trans, filename_write_helper, &param);
-	if (rc)
-		return rc;
-
-	return 0;
+	rc = hashtab_map(p->filename_trans, filenametr_write_helper, &param);
+out:
+	hashtab_destroy(param.filename_offsets);
+	return rc;
 }
 
 static int role_set_write(role_set_t * x, struct policy_file *fp)

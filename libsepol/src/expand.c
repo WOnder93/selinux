@@ -1368,71 +1368,17 @@ static int copy_role_trans(expand_state_t * state, role_trans_rule_t * rules)
 	return 0;
 }
 
-static int build_filename_table(filename_trans_rule_t *rules, char**out,
-				uint32_t *out_size)
-{
-	filename_trans_rule_t *cur_rule;
-	size_t size = 0, capacity = 1024, new_capacity;
-	char *table, *new_table;
-
-	table = malloc(capacity);
-	if (!table)
-		return -1;
-
-	for (cur_rule = rules; cur_rule; cur_rule = cur_rule->next) {
-		size_t name_size = strlen(cur_rule->name) + 1;
-
-		if (memmem(table, size, cur_rule->name, name_size))
-			continue;
-
-		new_capacity = capacity;
-		while (new_capacity < size + name_size) {
-			if (new_capacity > UINT32_MAX) {
-				free(table);
-				return -1;
-			}
-			new_capacity *= 2;
-		}
-		if (new_capacity > capacity) {
-			new_table = realloc(table, new_capacity);
-			if (!new_table) {
-				free(table);
-				return -1;
-			}
-			table = new_table;
-			capacity = new_capacity;
-		}
-		memcpy(table + size, cur_rule->name, name_size);
-		size += name_size;
-	}
-	*out = table;
-	*out_size = (uint32_t)size;
-	return 0;
-}
-
 static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *rules)
 {
-	char *new_name;
 	unsigned int i, j;
-	filename_trans_t key, *new_trans;
-	filename_trans_datum_t *otype;
 	filename_trans_rule_t *cur_rule;
 	ebitmap_t stypes, ttypes;
 	ebitmap_node_t *snode, *tnode;
 	int rc;
 
-	if (policydb_has_fname_table_feature(state->out) && rules) {
-		rc = build_filename_table(rules, &state->out->filename_mem,
-					  &state->out->filename_mem_size);
-		if (rc < 0) {
-			ERR(state->handle, "Out of memory!");
-			return -1;
-		}
-	}
-
 	cur_rule = rules;
 	while (cur_rule) {
-		uint32_t mapped_otype;
+		uint32_t mapped_otype, final_otype;
 
 		ebitmap_init(&stypes);
 		ebitmap_init(&ttypes);
@@ -1453,70 +1399,22 @@ static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *r
 
 		ebitmap_for_each_positive_bit(&stypes, snode, i) {
 			ebitmap_for_each_positive_bit(&ttypes, tnode, j) {
-				key.stype = i + 1;
-				key.ttype = j + 1;
-				key.tclass = cur_rule->tclass;
-				key.name = cur_rule->name;
-				otype = hashtab_search(state->out->filename_trans,
-						       (hashtab_key_t) &key);
-				if (otype) {
-					/* duplicate rule, ignore */
-					if (otype->otype == mapped_otype)
-						continue;
-
+				rc = policydb_add_filename_trans_rule(
+					state->out, i + 1, j + 1,
+					cur_rule->tclass, cur_rule->name,
+					NULL, mapped_otype, &final_otype);
+				if (rc) {
+					ERR(state->handle, "Out of memory!");
+					return -1;
+				}
+				if (final_otype != mapped_otype) {
 					ERR(state->handle, "Conflicting name-based type_transition %s %s:%s \"%s\":  %s vs %s",
 					    state->out->p_type_val_to_name[i],
 					    state->out->p_type_val_to_name[j],
 					    state->out->p_class_val_to_name[cur_rule->tclass - 1],
 					    cur_rule->name,
-					    state->out->p_type_val_to_name[otype->otype - 1],
+					    state->out->p_type_val_to_name[final_otype - 1],
 					    state->out->p_type_val_to_name[mapped_otype - 1]);
-					return -1;
-				}
-
-				new_trans = calloc(1, sizeof(*new_trans));
-				if (!new_trans) {
-					ERR(state->handle, "Out of memory!");
-					return -1;
-				}
-
-				if (policydb_has_fname_table_feature(state->out)) {
-					new_name = NULL;
-					new_trans->name = memmem(
-						state->out->filename_mem,
-						state->out->filename_mem_size,
-						cur_rule->name,
-						strlen(cur_rule->name) + 1);
-				} else {
-					new_name = strdup(cur_rule->name);
-					if (!new_name) {
-						ERR(state->handle, "Out of memory!");
-						free(new_trans);
-						return -1;
-					}
-					new_trans->name = new_name;
-				}
-				new_trans->stype = i + 1;
-				new_trans->ttype = j + 1;
-				new_trans->tclass = cur_rule->tclass;
-
-				otype = calloc(1, sizeof(*otype));
-				if (!otype) {
-					ERR(state->handle, "Out of memory!");
-					free(new_name);
-					free(new_trans);
-					return -1;
-				}
-				otype->otype = mapped_otype;
-
-				rc = hashtab_insert(state->out->filename_trans,
-						    (hashtab_key_t)new_trans,
-						    otype);
-				if (rc) {
-					ERR(state->handle, "Out of memory!");
-					free(otype);
-					free(new_name);
-					free(new_trans);
 					return -1;
 				}
 			}
