@@ -772,10 +772,9 @@ extern int policydb_set_target_platform(policydb_t *p, int platform);
 #define MOD_POLICYDB_VERSION_XPERMS_IOCTL  18
 #define MOD_POLICYDB_VERSION_INFINIBAND		19
 #define MOD_POLICYDB_VERSION_GLBLUB		20
-#define MOD_POLICYDB_VERSION_FNAME_TABLE	21 //FIXME remove this
 
 #define MOD_POLICYDB_VERSION_MIN MOD_POLICYDB_VERSION_BASE
-#define MOD_POLICYDB_VERSION_MAX MOD_POLICYDB_VERSION_FNAME_TABLE
+#define MOD_POLICYDB_VERSION_MAX MOD_POLICYDB_VERSION_GLBLUB
 
 #define POLICYDB_CONFIG_MLS    1
 
@@ -788,12 +787,6 @@ extern int policydb_set_target_platform(policydb_t *p, int platform);
 	  && p->policyvers >= POLICYDB_VERSION_BOUNDARY) ||	\
 	 ((p)->policy_type != POLICY_KERN			\
 	  && p->policyvers >= MOD_POLICYDB_VERSION_BOUNDARY))
-
-#define policydb_has_fname_table_feature(p)			\
-	(((p)->policy_type == POLICY_KERN			\
-	  && p->policyvers >= POLICYDB_VERSION_FNAME_TABLE) ||	\
-	 ((p)->policy_type != POLICY_KERN			\
-	  && p->policyvers >= MOD_POLICYDB_VERSION_FNAME_TABLE))
 
 /* the config flags related to unknown classes/perms are bits 2 and 3 */
 #define DENY_UNKNOWN	SEPOL_DENY_UNKNOWN

@@ -609,7 +609,7 @@ static int filenametr_write_helper(hashtab_key_t key, void *data, void *ptr)
 	struct filename_trans_datum *otype = data;
 	void *fp = param->fp;
 
-	if (policydb_has_fname_table_feature(p)) {
+	if (p->policyvers >= POLICYDB_VERSION_FNAME_TABLE) {
 		off = (size_t)hashtab_search(param->filename_offsets, ft->name);
 		buf[0] = cpu_to_le32(off);
 		items = put_entry(buf, sizeof(uint32_t), 1, fp);
@@ -648,7 +648,7 @@ static int filename_trans_write(struct policydb *p, void *fp)
 	if (p->policyvers < POLICYDB_VERSION_FILENAME_TRANS)
 		return 0;
 
-	if (policydb_has_fname_table_feature(p)) {
+	if (p->policyvers >= POLICYDB_VERSION_FNAME_TABLE) {
 		buf[0] = cpu_to_le32(p->total_filename_len);
 		items = put_entry(buf, sizeof(uint32_t), 1, fp);
 		if (items != 1)

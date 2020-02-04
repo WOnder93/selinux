@@ -328,13 +328,6 @@ static struct policydb_compat_info policydb_compat[] = {
 	 .target_platform = SEPOL_TARGET_SELINUX,
 	},
 	{
-	 .type = POLICY_BASE,
-	 .version = MOD_POLICYDB_VERSION_FNAME_TABLE,
-	 .sym_num = SYM_NUM,
-	 .ocon_num = OCON_IBENDPORT + 1,
-	 .target_platform = SEPOL_TARGET_SELINUX,
-	},
-	{
 	 .type = POLICY_MOD,
 	 .version = MOD_POLICYDB_VERSION_BASE,
 	 .sym_num = SYM_NUM,
@@ -449,13 +442,6 @@ static struct policydb_compat_info policydb_compat[] = {
 	{
 	 .type = POLICY_MOD,
 	 .version = MOD_POLICYDB_VERSION_GLBLUB,
-	 .sym_num = SYM_NUM,
-	 .ocon_num = 0,
-	 .target_platform = SEPOL_TARGET_SELINUX,
-	},
-	{
-	 .type = POLICY_MOD,
-	 .version = MOD_POLICYDB_VERSION_FNAME_TABLE,
 	 .sym_num = SYM_NUM,
 	 .ocon_num = 0,
 	 .target_platform = SEPOL_TARGET_SELINUX,
@@ -2718,7 +2704,7 @@ int filename_trans_read(policydb_t *p, struct policy_file *fp)
 	const char *name;
 	char *alloc_name = NULL, *buffer = NULL;
 
-	if (policydb_has_fname_table_feature(p)) {
+	if (p->policyvers >= POLICYDB_VERSION_FNAME_TABLE) {
 		rc = next_entry(buf, fp, sizeof(uint32_t));
 		if (rc < 0)
 			return -1;
@@ -2747,7 +2733,7 @@ int filename_trans_read(policydb_t *p, struct policy_file *fp)
 	nel = le32_to_cpu(buf[0]);
 
 	for (i = 0; i < nel; i++) {
-		if (policydb_has_fname_table_feature(p)) {
+		if (p->policyvers >= POLICYDB_VERSION_FNAME_TABLE) {
 			rc = next_entry(buf, fp, sizeof(uint32_t));
 			if (rc < 0)
 				goto err;
