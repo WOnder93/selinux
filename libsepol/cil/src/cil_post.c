@@ -1418,23 +1418,15 @@ static int __cil_expr_list_to_bitmap(struct cil_list *expr_list, ebitmap_t *out,
 	}
 
 	cil_list_for_each(expr, expr_list) {
-		ebitmap_t bitmap;
 		struct cil_list *l = (struct cil_list *)expr->data;
-		ebitmap_init(&bitmap);
-		rc = __cil_expr_to_bitmap(l, &bitmap, max, db);
+		rc = __cil_expr_to_bitmap(l, out, max, db);
 		if (rc != SEPOL_OK) {
 			cil_log(CIL_INFO, "Failed to expand expression list to bitmap\n");
-			ebitmap_destroy(&bitmap);
-			goto exit;
+			return SEPOL_ERR;
 		}
-		ebitmap_union(out, &bitmap);
-		ebitmap_destroy(&bitmap);
 	}
 
 	return SEPOL_OK;
-
-exit:
-	return SEPOL_ERR;
 }
 
 static int cil_typeattribute_used(struct cil_typeattribute *attr, struct cil_db *db)
