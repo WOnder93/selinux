@@ -3305,7 +3305,6 @@ int define_filename_trans(void)
 	ebitmap_node_t *snode, *tnode, *cnode;
 	filename_trans_rule_t *ftr;
 	type_datum_t *typdatum;
-	char *dup_name;
 	uint32_t otype;
 	unsigned int c, s, t;
 	int add, rc;
@@ -3387,12 +3386,10 @@ int define_filename_trans(void)
 	ebitmap_for_each_positive_bit(&e_tclasses, cnode, c) {
 		ebitmap_for_each_positive_bit(&e_stypes, snode, s) {
 			ebitmap_for_each_positive_bit(&e_ttypes, tnode, t) {
-				dup_name = NULL;
 				rc = policydb_filetrans_insert(
 					policydbp, s+1, t+1, c+1, name,
-					&dup_name, otype, NULL
+					NULL, otype, NULL
 				);
-				free(dup_name);
 				if (rc != SEPOL_OK) {
 					if (rc == SEPOL_EEXIST) {
 						yyerror2("duplicate filename transition for: filename_trans %s %s %s:%s",

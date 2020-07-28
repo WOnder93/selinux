@@ -1137,7 +1137,6 @@ int __cil_typetransition_to_avtab(policydb_t *pdb, const struct cil_db *db, stru
 	uint32_t otype;
 	struct cil_list_item *c;
 	char *name = DATUM(typetrans->name)->name;
-	char *dup_name;
 
 	if (name == CIL_KEY_STAR) {
 		struct cil_type_rule trans;
@@ -1176,13 +1175,11 @@ int __cil_typetransition_to_avtab(policydb_t *pdb, const struct cil_db *db, stru
 				rc = __cil_get_sepol_class_datum(pdb, DATUM(c->data), &sepol_obj);
 				if (rc != SEPOL_OK) goto exit;
 
-				dup_name = NULL;
 				rc = policydb_filetrans_insert(
 					pdb, sepol_src->s.value, sepol_tgt->s.value,
-					sepol_obj->s.value, name, &dup_name,
+					sepol_obj->s.value, name, NULL,
 					sepol_result->s.value, &otype
 				);
-				free(dup_name);
 				if (rc != SEPOL_OK) {
 					if (rc == SEPOL_EEXIST) {
 						if (sepol_result->s.value!= otype) {

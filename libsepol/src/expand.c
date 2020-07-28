@@ -1374,7 +1374,6 @@ static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *r
 	filename_trans_rule_t *cur_rule;
 	ebitmap_t stypes, ttypes;
 	ebitmap_node_t *snode, *tnode;
-	char *name;
 	int rc;
 
 	cur_rule = rules;
@@ -1400,14 +1399,11 @@ static int expand_filename_trans(expand_state_t *state, filename_trans_rule_t *r
 
 		ebitmap_for_each_positive_bit(&stypes, snode, i) {
 			ebitmap_for_each_positive_bit(&ttypes, tnode, j) {
-				name = NULL;
-
 				rc = policydb_filetrans_insert(
 					state->out, i + 1, j + 1,
 					cur_rule->tclass, cur_rule->name,
-					&name, mapped_otype, &present_otype
+					NULL, mapped_otype, &present_otype
 				);
-				free(name);
 				if (rc == SEPOL_EEXIST) {
 					/* duplicate rule, ignore */
 					if (present_otype == mapped_otype)

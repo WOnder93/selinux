@@ -2627,12 +2627,6 @@ int policydb_filetrans_insert(policydb_t *p, uint32_t stype, uint32_t ttype,
 		datum = datum->next;
 	}
 	if (!datum) {
-		if (!*name_alloc) {
-			*name_alloc = strdup(name);
-			if (!*name_alloc)
-				return SEPOL_ENOMEM;
-		}
-
 		datum = malloc(sizeof(*datum));
 		if (!datum)
 			return SEPOL_ENOMEM;
@@ -2644,23 +2638,37 @@ int policydb_filetrans_insert(policydb_t *p, uint32_t stype, uint32_t ttype,
 		if (last) {
 			last->next = datum;
 		} else {
+			char *name_dup;
+
+			if (name_alloc) {
+				name_dup = *name_alloc;
+				*name_alloc = NULL;
+			} else {
+				name_dup = strdup(name);
+				if (!name_dup) {
+					free(datum);
+					return SEPOL_ENOMEM;
+				}
+			}
+
 			ft = malloc(sizeof(*ft));
 			if (!ft) {
+				free(name_dup);
 				free(datum);
 				return SEPOL_ENOMEM;
 			}
 
 			ft->ttype = ttype;
 			ft->tclass = tclass;
-			ft->name = *name_alloc;
+			ft->name = name_dup;
 
 			if (hashtab_insert(p->filename_trans, (hashtab_key_t)ft,
 					   (hashtab_datum_t)datum)) {
+				free(name_dup);
 				free(datum);
 				free(ft);
 				return SEPOL_ENOMEM;
 			}
-			*name_alloc = NULL;
 		}
 	}
 
