@@ -130,6 +130,9 @@
 	(typepermissive device_t) 
 	(typemember device_t bin_t file exec_t)
 	(typetransition device_t console_t files console_device_t)
+	(typetransition device_t exec_type files console_device_t)
+	(typetransition exec_type self files console_device_t)
+	(typetransition exec_type self files "filename" console_device_t)
 
 	(roleattribute exec_role)
 	(roleattribute foo_role)
