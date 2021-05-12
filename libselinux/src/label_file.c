@@ -274,12 +274,11 @@ end_arch_check:
 		/* store the mapping between old and new */
 		newid = find_stem(data, buf, stem_len);
 		if (newid < 0) {
-			newid = store_stem(data, buf, stem_len);
+			newid = store_stem(data, buf, stem_len, true);
 			if (newid < 0) {
 				rc = newid;
 				goto out;
 			}
-			data->stem_arr[newid].from_mmap = 1;
 		}
 		stem_map[i] = newid;
 	}

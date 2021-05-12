@@ -62,7 +62,7 @@ struct spec {
 struct stem {
 	char *buf;
 	int len;
-	char from_mmap;
+	bool from_mmap;
 };
 
 /* Where we map the file in during selabel_open() */
@@ -276,7 +276,8 @@ static inline int find_stem(struct saved_data *data, const char *buf,
 }
 
 /* returns the index of the new stored object */
-static inline int store_stem(struct saved_data *data, char *buf, int stem_len)
+static inline int store_stem(struct saved_data *data, char *buf, int stem_len,
+			     bool from_mmap)
 {
 	int num = data->num_stems;
 
@@ -286,7 +287,8 @@ static inline int store_stem(struct saved_data *data, char *buf, int stem_len)
 		tmp_arr = realloc(data->stem_arr,
 				  sizeof(*tmp_arr) * alloc_stems);
 		if (!tmp_arr) {
-			free(buf);
+			if (!from_mmap)
+				free(buf);
 			return -1;
 		}
 		data->alloc_stems = alloc_stems;
@@ -294,7 +296,7 @@ static inline int store_stem(struct saved_data *data, char *buf, int stem_len)
 	}
 	data->stem_arr[num].len = stem_len;
 	data->stem_arr[num].buf = buf;
-	data->stem_arr[num].from_mmap = 0;
+	data->stem_arr[num].from_mmap = from_mmap;
 	data->num_stems++;
 
 	return num;
@@ -321,7 +323,7 @@ static inline int find_stem_from_spec(struct saved_data *data, const char *buf)
 	if (!stem)
 		return -1;
 
-	return store_stem(data, stem, stem_len);
+	return store_stem(data, stem, stem_len, false);
 }
 
 /* This will always check for buffer over-runs and either read the next entry
