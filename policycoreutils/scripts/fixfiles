@@ -153,7 +153,7 @@ newer() {
     shift
     LogReadOnly
     for m in `echo $FILESYSTEMSRW`; do
-	find $m -mount -newermt $DATE -print0 2>/dev/null | ${RESTORECON} ${FORCEFLAG} ${VERBOSE} ${THREADS} $* -i -0 -f -
+	find $m -xdev -newermt $DATE -print0 2>/dev/null | ${RESTORECON} ${FORCEFLAG} ${VERBOSE} ${THREADS} $* -i -0 -f -
     done;
 }
 
@@ -273,18 +273,22 @@ case "$RESTORE_MODE" in
 
 	UNDEFINED=`get_undefined_type` || exit $?
 	UNLABELED=`get_unlabeled_type` || exit $?
-	find /tmp \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) \( -type s -o -type p \) -delete
-	find /tmp \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference /tmp {} \;
-	find /var/tmp \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference /var/tmp {} \;
-	find /var/run \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference /var/run {} \;
-	[ ! -e /var/lib/debug ] || find /var/lib/debug \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference /lib {} \;
+	find -xdev /tmp \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) \( -type s -o -type p \) -delete
+	find -xdev /tmp \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference /tmp {} \;
+	find -xdev /var/tmp \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference /var/tmp {} \;
+	find -xdev /run \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference /run {} \;
+	# /run/user/<pid> may have an additional tmpfs mounted on it
+	for userdir in /run/user/*; do
+		find -xdev "$userdir" \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference "$userdir" {} \;
+	done
+	[ ! -e /var/lib/debug ] || find -xdev /var/lib/debug \( -context "*:${UNLABELED}*" -o -context "*:${UNDEFINED}*" \) -exec chcon --no-dereference --reference /lib {} \;
     ;;
 esac
 }
 
 fullrelabel() {
     echo "Cleaning out /tmp"
-    find /tmp/ -mindepth 1 -delete
+    find -xdev /tmp/ -mindepth 1 -delete
     restore Relabel
 }
 
