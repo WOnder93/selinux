@@ -5,9 +5,10 @@ on: [push, pull_request]
 jobs:
   build:
 
-    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
+        distro: [ubuntu-latest, ubuntu-24.04-arm]
         compiler: [gcc, clang]
         python-ruby-version:
           - {python: '3.13', ruby: '3.3'}
@@ -35,8 +36,13 @@ jobs:
           - compiler: clang
             python-ruby-version: {python: '3.13', ruby: '3.3', other: 'linker-gold'}
         include:
-          - compiler: gcc
+          - distro: ubuntu-latest
+            compiler: gcc
             python-ruby-version: {python: '3.13', ruby: '3.3', other: 'sanitizers'}
+          - distro: ubuntu-24.04-arm
+            compiler: gcc
+            python-ruby-version: {python: '3.13', ruby: '3.3', other: 'sanitizers'}
+    runs-on: ${{ matrix.distro }}
 
     steps:
     - uses: actions/checkout@v4
